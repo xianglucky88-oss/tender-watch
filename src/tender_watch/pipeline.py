@@ -16,9 +16,16 @@ class TenderPipeline:
         attachments = []
         for attachment in record.attachments:
             try:
-                attachments.append(replace(attachment, content=self.fetcher.fetch(attachment.url)))
-            except Exception:
-                # The notice remains ingestible, while storage records the attachment as unavailable.
-                attachments.append(attachment)
+                content = self.fetcher.fetch(attachment.url)
+                attachments.append(
+                    replace(attachment, content=content, available=True, fetch_error=None)
+                )
+            except Exception as exc:  # noqa: BLE001 - one bad file must not drop the notice
+                # The notice remains ingestible.  Storage records this attempt
+                # as unavailable while preserving any previously confirmed
+                # evidence.
+                attachments.append(
+                    replace(attachment, available=False, fetch_error=str(exc))
+                )
         record = replace(record, attachments=tuple(attachments))
         return record, self.store.upsert(record)
